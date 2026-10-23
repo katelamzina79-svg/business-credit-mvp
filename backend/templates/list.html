@@ -1,0 +1,1 @@
+{% extends "layout.html" %}{% block content %}<h1 class="text-3xl font-bold mb-2">Business Credit MVP</h1><p class="text-slate-600 mb-6">Базовый Jinja2 + HTMX шаблон.</p><div class="bg-white rounded-xl p-5 shadow"><h2 class="font-semibold mb-3">Список заявок</h2><div id="applications" hx-get="/api/applications" hx-trigger="load">Загрузка…</div></div>{% endblock %}
