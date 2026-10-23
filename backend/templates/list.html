@@ -1,1 +1,173 @@
-{% extends "layout.html" %}{% block content %}<h1 class="text-3xl font-bold mb-2">Business Credit MVP</h1><p class="text-slate-600 mb-6">Базовый Jinja2 + HTMX шаблон.</p><div class="bg-white rounded-xl p-5 shadow"><h2 class="font-semibold mb-3">Список заявок</h2><div id="applications" hx-get="/api/applications" hx-trigger="load">Загрузка…</div></div>{% endblock %}
+{% extends "layout.html" %}
+{% block content %}
+<div class="min-h-screen">
+  <header class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
+    <a href="/" class="flex items-center gap-3 no-underline">
+      <span class="grid place-items-center w-11 h-11 rounded-2xl bg-indigo-600 text-white font-bold text-lg">BC</span>
+      <span><span class="block font-bold text-xl tracking-tight">Бизнес.Кредит</span><span class="block text-xs text-slate-500">Финансирование для бизнеса</span></span>
+    </a>
+    <div id="header-user" class="hidden items-center gap-3"><span id="user-label" class="text-sm text-slate-600"></span><button id="logout" class="border border-slate-200 bg-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-slate-100">Выйти</button></div>
+  </header>
+
+  <section id="login-panel" class="max-w-xl mx-auto mt-10">
+    <div class="bg-white border border-slate-200 rounded-3xl shadow-sm p-7 sm:p-9">
+      <div class="inline-flex rounded-full bg-indigo-50 text-indigo-700 px-3 py-1 text-xs font-semibold mb-4">MVP · демо-стенд</div>
+      <h1 class="text-3xl font-bold tracking-tight mb-3">Заявка на финансирование — без лишней бюрократии</h1>
+      <p class="text-slate-600 mb-7">Войдите, чтобы выбрать продукт, проверить данные компании и отправить заявку. Сейчас используются демонстрационные данные.</p>
+      <form id="login-form" class="space-y-4">
+        <label class="block"><span class="text-sm font-medium">Email</span><input id="login-email" type="email" required autocomplete="username" value="client@example.com" class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500"></label>
+        <label class="block"><span class="text-sm font-medium">Пароль</span><input id="login-password" type="password" required autocomplete="current-password" value="client123" class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500"></label>
+        <button class="w-full rounded-xl bg-indigo-600 text-white font-semibold py-3 hover:bg-indigo-700">Войти в кабинет <span aria-hidden="true">→</span></button>
+      </form>
+      <div id="login-error" role="alert" class="hidden mt-4 rounded-xl bg-rose-50 text-rose-700 px-4 py-3 text-sm"></div>
+      <div class="mt-6 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600"><strong class="text-slate-800">Демо-доступ клиента</strong><br>client@example.com / client123</div>
+    </div>
+  </section>
+
+  <section id="app-panel" class="hidden">
+    <div class="grid lg:grid-cols-[1.25fr_.75fr] gap-6 items-stretch mb-8">
+      <div class="rounded-3xl bg-gradient-to-br from-indigo-700 to-violet-700 text-white p-7 sm:p-9 overflow-hidden relative">
+        <div class="relative z-10 max-w-xl"><p class="text-indigo-100 text-sm font-medium mb-3">Личный кабинет бизнеса</p><h1 class="text-3xl sm:text-4xl font-bold tracking-tight mb-4">Финансирование, которое помогает двигаться дальше.</h1><p class="text-indigo-100 leading-relaxed">Создайте заявку онлайн. Данные компании подтянутся из демонстрационного реестра, а статус будет виден на каждом этапе.</p><a href="#new-application" class="inline-flex mt-6 rounded-xl bg-white text-indigo-700 px-5 py-3 font-semibold hover:bg-indigo-50">Подать заявку ↓</a></div>
+        <div class="absolute -right-12 -bottom-20 w-64 h-64 rounded-full border-[32px] border-white/10"></div>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div class="rounded-3xl bg-white border border-slate-200 p-5"><span class="text-sm text-slate-500">Мои заявки</span><div id="stat-total" class="text-3xl font-bold mt-3">—</div><span class="text-xs text-slate-500">всего создано</span></div>
+        <div class="rounded-3xl bg-white border border-slate-200 p-5"><span class="text-sm text-slate-500">В обработке</span><div id="stat-active" class="text-3xl font-bold mt-3">—</div><span class="text-xs text-slate-500">ожидают решения</span></div>
+        <div class="col-span-2 rounded-3xl bg-emerald-50 border border-emerald-100 p-5"><div class="flex gap-3"><span class="grid place-items-center rounded-xl bg-white w-10 h-10 text-emerald-700">✓</span><div><h2 class="font-semibold text-emerald-950">Понятный статус на каждом шаге</h2><p class="text-sm text-emerald-800 mt-1">От отправки заявки до решения банка — без догадок, что происходит дальше.</p></div></div></div>
+      </div>
+    </div>
+
+    <div class="grid lg:grid-cols-[.9fr_1.1fr] gap-6 items-start">
+      <section id="new-application" class="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7">
+        <div class="mb-6"><p class="text-xs uppercase tracking-wider font-bold text-indigo-600">Новая заявка</p><h2 class="text-2xl font-bold mt-1">Что нужно вашему бизнесу?</h2><p class="text-sm text-slate-500 mt-2">Заполните основные параметры — это займёт пару минут.</p></div>
+        <form id="application-form" class="space-y-5">
+          <fieldset><legend class="text-sm font-semibold mb-2">Выберите продукт</legend><div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <label class="product-option cursor-pointer"><input type="radio" name="product" value="credit" checked class="peer sr-only"><span class="block rounded-xl border border-slate-200 p-3 peer-checked:border-indigo-600 peer-checked:bg-indigo-50 hover:border-indigo-300"><span class="block text-sm font-semibold">Кредит</span><span class="block text-xs text-slate-500 mt-1">На развитие</span></span></label>
+            <label class="product-option cursor-pointer"><input type="radio" name="product" value="overdraft" class="peer sr-only"><span class="block rounded-xl border border-slate-200 p-3 peer-checked:border-indigo-600 peer-checked:bg-indigo-50 hover:border-indigo-300"><span class="block text-sm font-semibold">Овердрафт</span><span class="block text-xs text-slate-500 mt-1">Разрывы cash flow</span></span></label>
+            <label class="product-option cursor-pointer"><input type="radio" name="product" value="working_capital" class="peer sr-only"><span class="block rounded-xl border border-slate-200 p-3 peer-checked:border-indigo-600 peer-checked:bg-indigo-50 hover:border-indigo-300"><span class="block text-sm font-semibold">Оборотный</span><span class="block text-xs text-slate-500 mt-1">Закупки и расходы</span></span></label>
+          </div></fieldset>
+          <div><label for="inn" class="block text-sm font-semibold mb-1">ИНН компании</label><div class="flex gap-2"><input id="inn" inputmode="numeric" pattern="[0-9]{10}|[0-9]{12}" maxlength="12" required placeholder="10 или 12 цифр" class="min-w-0 flex-1 rounded-xl border border-slate-300 px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none"><button id="lookup-company" type="button" class="rounded-xl border border-slate-300 px-4 py-3 font-medium text-sm hover:bg-slate-50">Проверить</button></div><p class="text-xs text-slate-500 mt-1">Для демо доступны ИНН из тестового реестра.</p></div>
+          <div id="company-card" class="hidden rounded-2xl border border-emerald-200 bg-emerald-50 p-4"><div class="flex items-start gap-3"><span class="grid place-items-center bg-white text-emerald-700 rounded-xl w-9 h-9">✓</span><div class="min-w-0"><p class="text-xs font-semibold text-emerald-800">КОМПАНИЯ НАЙДЕНА В МОК-РЕЕСТРЕ</p><p id="company-name" class="font-semibold mt-1"></p><p id="company-meta" class="text-sm text-emerald-800 mt-1"></p></div></div></div>
+          <input id="company-id" type="hidden">
+          <div class="grid sm:grid-cols-2 gap-4"><label class="block"><span class="text-sm font-semibold">Сумма, ₽</span><input id="amount" type="number" min="10000" max="100000000" step="10000" value="1000000" required class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500"></label><label class="block"><span class="text-sm font-semibold">Срок, месяцев</span><select id="term" class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500"><option value="3">3 месяца</option><option value="6">6 месяцев</option><option value="12" selected>12 месяцев</option><option value="24">24 месяца</option><option value="36">36 месяцев</option></select></label></div>
+          <label class="block"><span class="text-sm font-semibold">Цель финансирования</span><textarea id="purpose" rows="2" maxlength="500" placeholder="Например, закупка товара перед сезоном" class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500"></textarea></label>
+          <div id="form-error" role="alert" class="hidden rounded-xl bg-rose-50 text-rose-700 px-4 py-3 text-sm"></div>
+          <button id="create-application" class="w-full rounded-xl bg-indigo-600 text-white font-semibold py-3 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">Создать заявку</button>
+          <p class="text-xs text-slate-500 text-center">Создание заявки не означает одобрение кредита. Решение принимается после проверки.</p>
+        </form>
+      </section>
+
+      <section class="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7">
+        <div class="flex items-end justify-between gap-3 mb-5"><div><p class="text-xs uppercase tracking-wider font-bold text-indigo-600">История</p><h2 class="text-2xl font-bold mt-1">Мои заявки</h2></div><button id="refresh-applications" class="text-sm font-semibold text-indigo-700 hover:text-indigo-900">Обновить ↻</button></div>
+        <div id="applications-list" class="space-y-3"><div class="animate-pulse rounded-2xl bg-slate-100 h-24"></div></div>
+        <div class="mt-5 rounded-2xl bg-slate-50 p-4"><p class="text-xs text-slate-500"><strong class="text-slate-700">Как это работает:</strong> заявка → проверка данных → скоринг → решение банка. В этой версии часть этапов выполняется сотрудником банка в демонстрационном кабинете.</p></div>
+      </section>
+    </div>
+    <footer class="text-center text-xs text-slate-400 py-8">Business Credit MVP · демонстрационная версия · только тестовые данные</footer>
+  </section>
+</div>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tokenKey = 'businessCreditDemoToken';
+  let token = sessionStorage.getItem(tokenKey) || '';
+  let currentUser = null;
+  let selectedCompany = null;
+  const statusText = {draft:'Черновик',submitted:'Отправлена',data_check:'Проверка данных',scoring:'Скоринг',approved:'Одобрена',other_terms:'Предложены другие условия',documents_required:'Нужны документы',rejected:'Отказ',signing:'Подписание',disbursed:'Выдана'};
+  const statusColor = {draft:'bg-slate-100 text-slate-700',submitted:'bg-blue-50 text-blue-700',data_check:'bg-amber-50 text-amber-800',scoring:'bg-violet-50 text-violet-700',approved:'bg-emerald-50 text-emerald-700',other_terms:'bg-indigo-50 text-indigo-700',documents_required:'bg-amber-50 text-amber-800',rejected:'bg-rose-50 text-rose-700',signing:'bg-cyan-50 text-cyan-700',disbursed:'bg-emerald-50 text-emerald-700'};
+  const activeStatuses = new Set(['submitted','data_check','scoring','documents_required','signing']);
+  async function api(path, options={}) {
+    const headers = new Headers(options.headers || {});
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    if (options.body && !(options.body instanceof FormData)) headers.set('Content-Type','application/json');
+    const response = await fetch(path, {...options, headers});
+    let data = null; try { data = await response.json(); } catch (_) {}
+    if (!response.ok) throw new Error(data?.detail || `Ошибка запроса (${response.status})`);
+    return data;
+  }
+  function showError(id, message) { $(id).textContent = message; $(id).classList.remove('hidden'); }
+  function hideError(id) { $(id).classList.add('hidden'); $(id).textContent = ''; }
+  function showApp() {
+    $('login-panel').classList.add('hidden'); $('app-panel').classList.remove('hidden'); $('header-user').classList.remove('hidden'); $('header-user').classList.add('flex');
+    $('user-label').textContent = currentUser ? `${currentUser.email}${currentUser.role === 'banker' ? ' · сотрудник банка' : ''}` : '';
+    if (currentUser?.role === 'banker') {
+      $('new-application').classList.add('hidden');
+      $('applications-list').insertAdjacentHTML('beforebegin','<div class="mb-4 rounded-xl bg-indigo-50 text-indigo-800 text-sm p-3">Вы вошли как сотрудник банка. Очередь заявок доступна в API: <code>/api/applications/banker/queue</code> (Swagger — <code>/docs</code>).</div>');
+    }
+  }
+  function showLogin() { $('app-panel').classList.add('hidden'); $('login-panel').classList.remove('hidden'); $('header-user').classList.add('hidden'); }
+  async function loadUser() {
+    if (!token) return showLogin();
+    try { currentUser = await api('/api/auth/me'); showApp(); await loadApplications(); }
+    catch (_) { token=''; sessionStorage.removeItem(tokenKey); showLogin(); }
+  }
+  $('login-form').addEventListener('submit', async (event) => {
+    event.preventDefault(); hideError('login-error');
+    const body = new URLSearchParams({username:$('login-email').value.trim(), password:$('login-password').value});
+    try {
+      const response = await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});
+      const data = await response.json(); if (!response.ok) throw new Error(data.detail || 'Не удалось войти');
+      token = data.access_token; sessionStorage.setItem(tokenKey,token); currentUser = await api('/api/auth/me'); showApp(); await loadApplications();
+    } catch (error) { showError('login-error',error.message); }
+  });
+  $('logout').addEventListener('click', () => { token=''; currentUser=null; selectedCompany=null; sessionStorage.removeItem(tokenKey); showLogin(); });
+  $('lookup-company').addEventListener('click', async () => {
+    hideError('form-error'); $('company-card').classList.add('hidden'); selectedCompany=null; $('company-id').value='';
+    const inn = $('inn').value.trim();
+    if (!/^\d{10}(\d{2})?$/.test(inn)) return showError('form-error','Введите ИНН из 10 или 12 цифр.');
+    const button = $('lookup-company'); button.disabled=true; button.textContent='Проверяем…';
+    try {
+      selectedCompany = await api(`/api/companies/lookup/${encodeURIComponent(inn)}`);
+      $('company-id').value=selectedCompany.id; $('company-name').textContent=selectedCompany.name; $('company-meta').textContent=`ИНН ${selectedCompany.inn} · ОКВЭД ${selectedCompany.okved} · выручка ${Number(selectedCompany.revenue).toLocaleString('ru-RU')} ₽`;
+      $('company-card').classList.remove('hidden');
+    } catch (error) { showError('form-error',`${error.message}. Для демонстрации используйте ИНН 7701234567 или 7707654321.`); }
+    finally { button.disabled=false; button.textContent='Проверить'; }
+  });
+  $('inn').addEventListener('input', () => { selectedCompany=null; $('company-id').value=''; $('company-card').classList.add('hidden'); });
+  $('application-form').addEventListener('submit', async (event) => {
+    event.preventDefault(); hideError('form-error');
+    if (!selectedCompany || !$('company-id').value) return showError('form-error','Сначала проверьте ИНН компании.');
+    const amount=Number($('amount').value), term=Number($('term').value);
+    if (!Number.isFinite(amount) || amount < 10000) return showError('form-error','Минимальная сумма заявки — 10 000 ₽.');
+    const button=$('create-application'); button.disabled=true; button.textContent='Создаём заявку…';
+    try {
+      const created=await api('/api/applications',{method:'POST',body:JSON.stringify({company_id:Number($('company-id').value),product:document.querySelector('input[name="product"]:checked').value,amount,term_months:term,purpose:$('purpose').value.trim() || null})});
+      await api(`/api/applications/${created.id}/submit`,{method:'POST'});
+      selectedCompany=null; $('company-id').value=''; $('company-card').classList.add('hidden'); $('inn').value=''; $('purpose').value='';
+      await loadApplications();
+      $('applications-list').scrollIntoView({behavior:'smooth',block:'start'});
+    } catch (error) { showError('form-error',error.message); }
+    finally { button.disabled=false; button.textContent='Создать заявку'; }
+  });
+  function money(value) { return new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB',maximumFractionDigits:0}).format(Number(value)); }
+  function card(app) {
+    const badge=statusColor[app.status] || 'bg-slate-100 text-slate-700';
+    const title=statusText[app.status] || app.status;
+    const stepOrder=['submitted','data_check','scoring','approved'];
+    const idx=stepOrder.indexOf(app.status);
+    const progress=app.status==='rejected' ? 0 : app.status==='disbursed' ? 100 : app.status==='signing' ? 90 : app.status==='other_terms' || app.status==='documents_required' ? 75 : Math.max(18,(idx+1)*24);
+    return `<article class="rounded-2xl border border-slate-200 p-4 hover:border-indigo-200 transition"><div class="flex items-start justify-between gap-3"><div><p class="text-xs text-slate-500">Заявка №${app.id}</p><h3 class="font-semibold mt-1">${money(app.amount)} · ${app.term_months} мес.</h3><p class="text-sm text-slate-500 mt-1">${({'credit':'Кредит','overdraft':'Овердрафт','working_capital':'Оборотный кредит'})[app.product] || app.product}</p></div><span class="shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${badge}">${title}</span></div><div class="mt-4 h-1.5 rounded-full bg-slate-100 overflow-hidden"><div class="h-full rounded-full bg-indigo-500" style="width:${progress}%"></div></div><div class="flex justify-between mt-2 text-[11px] text-slate-400"><span>Отправлена</span><span>Проверка</span><span>Решение</span></div><p class="mt-3 text-sm text-slate-600">${app.purpose ? escapeHtml(app.purpose) : 'Цель финансирования не указана'}</p><button class="history-button mt-3 text-sm font-semibold text-indigo-700 hover:text-indigo-900" data-id="${app.id}">История статусов +</button><div id="history-${app.id}" class="hidden mt-3 rounded-xl bg-slate-50 p-3 text-sm"></div></article>`;
+  }
+  function escapeHtml(value) { return String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
+  async function loadApplications() {
+    const list=$('applications-list'); list.innerHTML='<div class="rounded-2xl bg-slate-100 h-24 animate-pulse"></div>';
+    try {
+      const apps=await api('/api/applications'); $('stat-total').textContent=apps.length; $('stat-active').textContent=apps.filter(a=>activeStatuses.has(a.status)).length;
+      list.innerHTML=apps.length ? apps.map(card).join('') : '<div class="rounded-2xl border border-dashed border-slate-300 p-8 text-center"><div class="text-3xl mb-3">↗</div><h3 class="font-semibold">Заявок пока нет</h3><p class="text-sm text-slate-500 mt-1">Создайте первую заявку — она появится здесь.</p></div>';
+    } catch (error) { list.innerHTML=`<div class="rounded-xl bg-rose-50 text-rose-700 p-4 text-sm">${escapeHtml(error.message)}</div>`; }
+  }
+  $('applications-list').addEventListener('click', async (event) => {
+    const button=event.target.closest('.history-button'); if (!button) return;
+    const target=$(`history-${button.dataset.id}`);
+    if (!target.classList.contains('hidden')) { target.classList.add('hidden'); button.textContent='История статусов +'; return; }
+    target.classList.remove('hidden'); target.textContent='Загружаем историю…'; button.textContent='Скрыть историю −';
+    try {
+      const history=await api(`/api/applications/${button.dataset.id}/history`);
+      target.innerHTML=history.length ? history.map(item=>`<div class="flex gap-3 py-1.5"><span class="mt-1.5 w-2 h-2 shrink-0 rounded-full bg-indigo-500"></span><div><p class="font-medium">${escapeHtml(statusText[item.to_status] || item.to_status)}</p><p class="text-xs text-slate-500">${new Date(item.created_at+'Z').toLocaleString('ru-RU')}</p></div></div>`).join('') : 'История пока пуста.';
+    } catch(error) { target.textContent=error.message; }
+  });
+  $('refresh-applications').addEventListener('click',loadApplications);
+  loadUser();
+})();
+</script>
+{% endblock %}
