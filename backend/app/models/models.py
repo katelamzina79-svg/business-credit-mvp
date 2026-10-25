@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum
-from sqlalchemy import String, Integer, ForeignKey, DateTime, Numeric, Text, Boolean
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import String, Integer, ForeignKey, DateTime, Numeric, Text, Boolean, JSON
+from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
 
 class UserRole(str, Enum):
@@ -48,6 +48,14 @@ class Application(Base):
     term_months: Mapped[int] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String(30), default=ApplicationStatus.draft.value)
     purpose: Mapped[str | None] = mapped_column(Text, nullable=True)
+    score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    risk_level: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    score_factors: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    decision_recommendation: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    decision_reasons: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    bki_overdue_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    recommended_amount: Mapped[float | None] = mapped_column(Numeric(14, 2), nullable=True)
+    external_checks: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

@@ -15,7 +15,7 @@ ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     },
     ApplicationStatus.approved.value: {ApplicationStatus.signing.value},
     ApplicationStatus.other_terms.value: {ApplicationStatus.signing.value},
-    ApplicationStatus.documents_required.value: {ApplicationStatus.submitted.value},
+    ApplicationStatus.documents_required.value: {ApplicationStatus.scoring.value},
     ApplicationStatus.signing.value: {ApplicationStatus.disbursed.value},
     ApplicationStatus.rejected.value: set(),
     ApplicationStatus.disbursed.value: set(),

@@ -1,0 +1,483 @@
+{
+  "info": {
+    "name": "Business Credit MVP — Petos E2E",
+    "description": "Smoke/E2E requests for the demo API. Uses seeded demo accounts and synthetic company registry data only. Run requests in order; wait until the application status becomes scoring before choosing one banker decision. Decision requests are alternatives, not all meant to be run in one flow.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "clientEmail",
+      "value": "client@example.com"
+    },
+    {
+      "key": "clientPassword",
+      "value": "client123"
+    },
+    {
+      "key": "bankerEmail",
+      "value": "banker@example.com"
+    },
+    {
+      "key": "bankerPassword",
+      "value": "banker123"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "companyId",
+      "value": ""
+    },
+    {
+      "key": "applicationId",
+      "value": ""
+    },
+    {
+      "key": "testInn",
+      "value": "7701234567"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Client — login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "username",
+              "value": "{{clientEmail}}",
+              "type": "text"
+            },
+            {
+              "key": "password",
+              "value": "{{clientPassword}}",
+              "type": "text"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/api/auth/login"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Login returns 200', () => pm.response.to.have.status(200));",
+              "const data = pm.response.json();",
+              "if (data.access_token) pm.collectionVariables.set('token', data.access_token);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Client — current user",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/auth/me"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Authenticated as client', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().role).to.eql('client'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Client — lookup seeded company by INN",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/companies/lookup/{{testInn}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Company lookup succeeds', () => pm.response.to.have.status(200));",
+              "const data = pm.response.json();",
+              "if (data.id) pm.collectionVariables.set('companyId', String(data.id));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Client — create draft application",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"company_id\": {{companyId}},\n  \"product\": \"credit\",\n  \"amount\": 1000000,\n  \"term_months\": 24,\n  \"purpose\": \"Пополнение оборотных средств\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{baseUrl}}/api/applications"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Draft created', () => pm.response.to.have.status(201));",
+              "const data = pm.response.json();",
+              "if (data.id) pm.collectionVariables.set('applicationId', String(data.id));",
+              "pm.test('Initial status is draft', () => pm.expect(data.status).to.eql('draft'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Client — submit application (queues checks/scoring)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/applications/{{applicationId}}/submit"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Application submitted', () => pm.response.to.have.status(200));",
+              "pm.test('Pipeline started', () => pm.expect(['submitted','data_check','scoring']).to.include(pm.response.json().status));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Client — get application (repeat to inspect scoring result)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/applications/{{applicationId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Application is readable', () => pm.response.to.have.status(200));",
+              "const data = pm.response.json();",
+              "console.log('Current status:', data.status, 'score:', data.score, 'recommendation:', data.decision_recommendation);",
+              "pm.test('Scoring fields populated once scoring is complete', () => { if (data.status === 'scoring') { pm.expect(data.score).to.be.a('number'); pm.expect(data.decision_recommendation).to.be.a('string'); } });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Client — personalized feed",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/feed"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Feed responds with suggestions array', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().suggestions).to.be.an('array'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Banker — login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "username",
+              "value": "{{bankerEmail}}",
+              "type": "text"
+            },
+            {
+              "key": "password",
+              "value": "{{bankerPassword}}",
+              "type": "text"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/api/auth/login"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Banker login returns 200', () => pm.response.to.have.status(200));",
+              "const data = pm.response.json();",
+              "if (data.access_token) pm.collectionVariables.set('token', data.access_token);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Banker — queue",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/applications/banker/queue"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Banker queue returns 200 and an array', () => { pm.response.to.have.status(200); pm.expect(pm.response.json()).to.be.an('array'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Banker — get application detail",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/applications/{{applicationId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Banker can inspect application', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. Banker — decision: approved (alternative)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"target_status\": \"approved\",\n  \"comment\": \"E2E demo: banker confirms recommendation\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{baseUrl}}/api/applications/{{applicationId}}/transition"
+      },
+      "description": "Run only if current status is scoring and the approved transition is appropriate for this test application. This is one of four alternative decision requests."
+    },
+    {
+      "name": "12. Banker — decision: other terms (alternative)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"target_status\": \"other_terms\",\n  \"comment\": \"E2E demo: offer with revised terms\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{baseUrl}}/api/applications/{{applicationId}}/transition"
+      },
+      "description": "Run only if current status is scoring. For a successful signing demo, use this or the approved decision, then run the client sign request."
+    },
+    {
+      "name": "13. Banker — decision: documents required (alternative)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"target_status\": \"documents_required\",\n  \"comment\": \"E2E demo: request additional documents\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{baseUrl}}/api/applications/{{applicationId}}/transition"
+      },
+      "description": "Run only if current status is scoring. To continue the demo after this branch, transition documents_required back to scoring when the workflow permits it."
+    },
+    {
+      "name": "14. Banker — decision: rejected (alternative)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"target_status\": \"rejected\",\n  \"comment\": \"E2E demo: decline\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{baseUrl}}/api/applications/{{applicationId}}/transition"
+      },
+      "description": "Run only if current status is scoring. Terminal alternative; do not run the signing request afterwards."
+    },
+    {
+      "name": "15. Client — sign demo offer",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/applications/{{applicationId}}/sign"
+      },
+      "description": "The collection's token variable is currently the banker token after request 8. Re-run Client — login before this request, then run only if application status is approved or other_terms."
+    },
+    {
+      "name": "16. System — health",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/health"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('API and database health check', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().status).to.eql('ok'); });"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

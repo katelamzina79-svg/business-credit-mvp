@@ -40,3 +40,11 @@ class ApplicationOut(ApplicationCreate):
     id: int
     client_id: int
     status: ApplicationStatus
+    score: int | None = None
+    risk_level: str | None = None
+    score_factors: list[dict] | None = None
+    decision_recommendation: str | None = None
+    decision_reasons: list[str] | None = None
+    bki_overdue_days: int | None = None
+    recommended_amount: float | None = None
+    external_checks: dict | None = None
