@@ -1,0 +1,28 @@
+# Third-Party Notices
+
+This project is a hackathon/demo MVP. Dependencies below are pinned in `backend/requirements.txt`.
+This file is a dependency notice index; it is **not** a substitute for the complete license texts distributed with each package. Verify the installed/transitive dependency tree and license metadata before external redistribution.
+
+## Direct Python dependencies
+
+| Package | Pinned version | License (upstream metadata; verify for the exact release) | Upstream |
+|---|---:|---|---|
+| FastAPI | 0.115.6 | MIT | https://github.com/fastapi/fastapi |
+| Uvicorn | 0.34.0 | BSD-3-Clause | https://github.com/encode/uvicorn |
+| SQLAlchemy | 2.0.36 | MIT | https://github.com/sqlalchemy/sqlalchemy |
+| psycopg | 3.2.3 | LGPL-3.0-only (binary extra may bundle additional components; verify package metadata) | https://github.com/psycopg/psycopg |
+| Alembic | 1.14.0 | MIT | https://github.com/sqlalchemy/alembic |
+| pydantic-settings | 2.7.1 | MIT | https://github.com/pydantic/pydantic-settings |
+| python-jose | 3.3.0 | MIT | https://github.com/mpdavis/python-jose |
+| Passlib | 1.7.4 | BSD-3-Clause | https://github.com/passlib2/passlib |
+| bcrypt | 4.0.1 | Apache-2.0 | https://github.com/pyca/bcrypt |
+| Jinja2 | 3.1.5 | BSD-3-Clause | https://github.com/pallets/jinja |
+| python-multipart | 0.0.20 | Apache-2.0 | https://github.com/Kludex/python-multipart |
+| pytest | 8.3.4 | MIT | https://github.com/pytest-dev/pytest |
+| httpx | 0.28.1 | BSD-3-Clause | https://github.com/encode/httpx |
+
+## Other components
+
+- PostgreSQL container: `postgres:16-alpine` (see `backend/docker-compose.yml`). PostgreSQL is distributed under the PostgreSQL License: https://www.postgresql.org/about/licence/
+- Python package extras and transitive dependencies may bring additional license obligations. The table above lists direct requirements only; generate and review a complete dependency/license inventory from the actual environment before production or commercial distribution.
+- The app's EGRUL/BKI responses and scoring are synthetic/demo implementations. They are not real external services and must not be represented as live bureau or registry integrations.
