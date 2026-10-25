@@ -6,6 +6,8 @@ from app.schemas.schemas import ApplicationCreate, ApplicationOut
 from app.schemas.workflow import TransitionRequest, StatusHistoryOut
 from app.api.deps import current_user, banker_only
 from app.services.workflow import validate_transition
+from app.services.external_checks import run_external_checks
+from app.services.credit_pipeline import evaluate_application
 
 router = APIRouter(prefix="/api/applications", tags=["applications"])
 
@@ -23,6 +25,8 @@ def _get_visible_application(application_id: int, db: Session, user: User) -> Ap
 def create_application(data: ApplicationCreate, db: Session = Depends(get_db), user: User = Depends(current_user)):
     if not db.get(Company, data.company_id):
         raise HTTPException(status_code=404, detail="Company not found")
+    if data.product not in {"credit", "overdraft", "working_capital"}:
+        raise HTTPException(status_code=422, detail="Unsupported credit product")
     application = Application(client_id=user.id, status=ApplicationStatus.draft.value, **data.model_dump())
     db.add(application)
     db.flush()
@@ -38,14 +42,43 @@ def list_applications(db: Session = Depends(get_db), user: User = Depends(curren
     query = db.query(Application)
     if user.role != "banker":
         query = query.filter(Application.client_id == user.id)
-    return query.order_by(Application.created_at.desc()).all()
+    return query.order_by(Application.created_at.desc(), Application.id.desc()).all()
 
 
-# Declare fixed paths before /{application_id} so "banker" isn't parsed as an ID.
-@router.get("/banker/queue", response_model=list[ApplicationOut])
+# Fixed path must be declared before /{application_id}.
+@router.get("/banker/queue")
 def banker_queue(db: Session = Depends(get_db), user: User = Depends(banker_only)):
-    queue_statuses = [ApplicationStatus.submitted.value, ApplicationStatus.data_check.value, ApplicationStatus.scoring.value]
-    return db.query(Application).filter(Application.status.in_(queue_statuses)).order_by(Application.created_at).all()
+    queue_statuses = [
+        ApplicationStatus.submitted.value,
+        ApplicationStatus.data_check.value,
+        ApplicationStatus.scoring.value,
+        ApplicationStatus.approved.value,
+        ApplicationStatus.other_terms.value,
+        ApplicationStatus.documents_required.value,
+        ApplicationStatus.signing.value,
+    ]
+    applications = (
+        db.query(Application)
+        .filter(Application.status.in_(queue_statuses))
+        .order_by(Application.created_at, Application.id)
+        .all()
+    )
+    result = []
+    for application in applications:
+        company = db.get(Company, application.company_id)
+        result.append({
+            "application": ApplicationOut.model_validate(application).model_dump(mode="json"),
+            "company": {
+                "id": company.id,
+                "inn": company.inn,
+                "name": company.name,
+                "okved": company.okved,
+                "revenue": float(company.revenue or 0),
+                "debt": float(company.debt or 0),
+                "overdue_days": company.overdue_days or 0,
+            },
+        })
+    return result
 
 
 @router.get("/{application_id}/history", response_model=list[StatusHistoryOut])
@@ -59,7 +92,25 @@ def submit(application_id: int, db: Session = Depends(get_db), user: User = Depe
     application = _get_visible_application(application_id, db, user)
     if application.status != ApplicationStatus.draft.value:
         raise HTTPException(status_code=409, detail="Only a draft application can be submitted")
+    company = db.get(Company, application.company_id)
+    if not company:
+        raise HTTPException(status_code=422, detail="Company record is missing; cannot run checks")
+
+    # Synchronous orchestration keeps the demo deterministic and avoids a worker dependency.
     _apply_transition(application, ApplicationStatus.submitted.value, db, user, "application.submitted")
+    _apply_transition(application, ApplicationStatus.data_check.value, db, user, "application.external_checks.started")
+    checks = run_external_checks(company)
+    result = evaluate_application(application, company, checks)
+    application.score = result["score"]
+    application.risk_level = result["risk_level"]
+    application.score_factors = result["score_factors"]
+    application.decision_recommendation = result["decision_recommendation"]
+    application.decision_reasons = result["decision_reasons"]
+    application.bki_overdue_days = result["bki_overdue_days"]
+    application.recommended_amount = result["recommended_amount"]
+    application.external_checks = result["external_checks"]
+    db.add(AuditLog(user_id=user.id, action="application.scoring.completed", entity_type="application", entity_id=application.id))
+    _apply_transition(application, ApplicationStatus.scoring.value, db, user, "application.scoring.completed")
     db.commit()
     db.refresh(application)
     return application
@@ -75,10 +126,16 @@ def transition_application(application_id: int, data: TransitionRequest, db: Ses
         validate_transition(application.status, target)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if application.status == ApplicationStatus.scoring.value and target in {
+        ApplicationStatus.approved.value,
+        ApplicationStatus.other_terms.value,
+        ApplicationStatus.documents_required.value,
+        ApplicationStatus.rejected.value,
+    }:
+        db.add(AuditLog(user_id=user.id, action=f"application.decision_recommendation:{application.decision_recommendation};chosen:{target}", entity_type="application", entity_id=application.id))
     action = f"application.status_changed:{application.status}->{target}"
     _apply_transition(application, target, db, user, action)
     if data.comment:
-        # Comments are retained in the audit action so the MVP doesn't need a migration.
         db.add(AuditLog(user_id=user.id, action=f"comment:{data.comment}", entity_type="application", entity_id=application.id))
     db.commit()
     db.refresh(application)
