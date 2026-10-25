@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.db.session import get_db
+from app.db.session import get_db, SessionLocal
 from app.models.models import Application, Company, User, StatusHistory, AuditLog, ApplicationStatus
 from app.schemas.schemas import ApplicationCreate, ApplicationOut
 from app.schemas.workflow import TransitionRequest, StatusHistoryOut
@@ -88,31 +88,25 @@ def application_history(application_id: int, db: Session = Depends(get_db), user
 
 
 @router.post("/{application_id}/submit", response_model=ApplicationOut)
-def submit(application_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+def submit(
+    application_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+):
     application = _get_visible_application(application_id, db, user)
     if application.status != ApplicationStatus.draft.value:
+        # This status guard makes repeated submissions idempotent: the pipeline is queued once.
         raise HTTPException(status_code=409, detail="Only a draft application can be submitted")
     company = db.get(Company, application.company_id)
     if not company:
         raise HTTPException(status_code=422, detail="Company record is missing; cannot run checks")
 
-    # Synchronous orchestration keeps the demo deterministic and avoids a worker dependency.
     _apply_transition(application, ApplicationStatus.submitted.value, db, user, "application.submitted")
     _apply_transition(application, ApplicationStatus.data_check.value, db, user, "application.external_checks.started")
-    checks = run_external_checks(company)
-    result = evaluate_application(application, company, checks)
-    application.score = result["score"]
-    application.risk_level = result["risk_level"]
-    application.score_factors = result["score_factors"]
-    application.decision_recommendation = result["decision_recommendation"]
-    application.decision_reasons = result["decision_reasons"]
-    application.bki_overdue_days = result["bki_overdue_days"]
-    application.recommended_amount = result["recommended_amount"]
-    application.external_checks = result["external_checks"]
-    db.add(AuditLog(user_id=user.id, action="application.scoring.completed", entity_type="application", entity_id=application.id))
-    _apply_transition(application, ApplicationStatus.scoring.value, db, user, "application.scoring.completed")
     db.commit()
     db.refresh(application)
+    background_tasks.add_task(_process_application_pipeline, application.id, user.id)
     return application
 
 
@@ -165,3 +159,34 @@ def _apply_transition(application: Application, target: str, db: Session, user: 
     application.status = target
     db.add(StatusHistory(application_id=application.id, from_status=previous, to_status=target))
     db.add(AuditLog(user_id=user.id, action=action, entity_type="application", entity_id=application.id))
+
+
+def _process_application_pipeline(application_id: int, actor_id: int) -> None:
+    """Run mock checks/scoring after the submit response; status guard prevents duplicate work."""
+    with SessionLocal() as task_db:
+        application = task_db.get(Application, application_id)
+        actor = task_db.get(User, actor_id)
+        if not application or not actor or application.status != ApplicationStatus.data_check.value:
+            return
+        company = task_db.get(Company, application.company_id)
+        if not company:
+            task_db.add(AuditLog(user_id=actor.id, action="application.pipeline_failed:company_missing", entity_type="application", entity_id=application.id))
+            task_db.commit()
+            return
+        try:
+            checks = run_external_checks(company)
+            result = evaluate_application(application, company, checks)
+            application.score = result["score"]
+            application.risk_level = result["risk_level"]
+            application.score_factors = result["score_factors"]
+            application.decision_recommendation = result["decision_recommendation"]
+            application.decision_reasons = result["decision_reasons"]
+            application.bki_overdue_days = result["bki_overdue_days"]
+            application.recommended_amount = result["recommended_amount"]
+            application.external_checks = result["external_checks"]
+            _apply_transition(application, ApplicationStatus.scoring.value, task_db, actor, "application.scoring.completed")
+            task_db.commit()
+        except Exception:
+            task_db.rollback()
+            task_db.add(AuditLog(user_id=actor.id, action="application.pipeline_failed:unexpected_error", entity_type="application", entity_id=application.id))
+            task_db.commit()
