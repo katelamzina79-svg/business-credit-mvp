@@ -12,6 +12,12 @@ def test_valid_happy_path_transitions():
     validate_transition(ApplicationStatus.signing.value, ApplicationStatus.disbursed.value)
 
 
+def test_documents_return_to_scoring_so_banker_can_decide_again():
+    validate_transition(ApplicationStatus.scoring.value, ApplicationStatus.documents_required.value)
+    validate_transition(ApplicationStatus.documents_required.value, ApplicationStatus.scoring.value)
+    validate_transition(ApplicationStatus.scoring.value, ApplicationStatus.other_terms.value)
+
+
 def test_disallowed_transition_is_rejected():
     with pytest.raises(ValueError, match="not allowed"):
         validate_transition(ApplicationStatus.draft.value, ApplicationStatus.approved.value)
