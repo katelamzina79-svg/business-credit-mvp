@@ -1,1 +1,48 @@
-{% extends "layout.html" %}{% block content %}<div class="max-w-md mx-auto bg-white p-6 rounded-xl shadow"><h1 class="text-2xl font-semibold mb-4">Вход</h1><form class="space-y-3"><input class="w-full border rounded p-2" name="email" placeholder="Email"><input class="w-full border rounded p-2" type="password" name="password" placeholder="Пароль"><button class="w-full bg-black text-white rounded p-2">Войти</button></form></div>{% endblock %}
+{% extends "layout.html" %}
+{% block content %}
+<style>
+  /* Фирменная стилизация Альфа-Банка для экрана входа */
+  .alfa-card {
+    background-color: #FFFFFF !important;
+    border: 1px solid #E8EAEF !important;
+    border-radius: 12px !important;
+    box-shadow: 0px 4px 16px rgba(11, 17, 24, 0.04) !important;
+  }
+  .alfa-input {
+    border: 1px solid #D1D5DB !important;
+    border-radius: 8px !important;
+    font-family: 'Inter', -apple-system, sans-serif !important;
+    color: #0B1118 !important;
+    transition: all 0.15s ease-in-out !important;
+  }
+  .alfa-input:focus {
+    border-color: #EF3124 !important;
+    outline: none !important;
+    box-shadow: 0 0 0 1px #EF3124 !important;
+  }
+  .alfa-btn {
+    background-color: #EF3124 !important;
+    color: #FFFFFF !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    font-family: 'Inter', -apple-system, sans-serif !important;
+    transition: background-color 0.15s ease-in-out !important;
+  }
+  .alfa-btn:hover {
+    background-color: #D7241A !important;
+  }
+  .alfa-title {
+    color: #0B1118 !important;
+    font-family: 'Inter', -apple-system, sans-serif !important;
+  }
+</style>
+
+<div class="max-w-md mx-auto bg-white p-6 rounded-xl shadow alfa-card">
+  <h1 class="text-2xl font-semibold mb-4 alfa-title">Вход</h1>
+  <form class="space-y-3">
+    <input class="w-full border rounded p-2 alfa-input" name="email" placeholder="Email">
+    <input class="w-full border rounded p-2 alfa-input" type="password" name="password" placeholder="Пароль">
+    <button class="w-full bg-black text-white rounded p-2 alfa-btn">Войти</button>
+  </form>
+</div>
+{% endblock %}
