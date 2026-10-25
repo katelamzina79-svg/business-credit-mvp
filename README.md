@@ -27,4 +27,4 @@ Test accounts (local demo only):
 - `banker@example.com` / `banker123`
 
 ## Important
-This is a development MVP foundation, not production-ready software. Do not use real customer or banking data. Change development secrets before any shared or deployed environment. The ML scoring pipeline and real external integrations are still planned work. The current INN lookup uses seeded mock data; banker workflow is available through the API/Swagger, while a full banker-facing UI remains planned.
+This is a development MVP foundation, not production-ready software. Do not use real customer or banking data. Change development secrets before any shared or deployed environment. Scoring is a demo LogisticRegression on synthetic data plus a separate decision layer (see `backend/app/ml/README.md`); real external integrations are still planned work. The current INN lookup uses seeded mock data; banker workflow is available through the API/Swagger, while a full banker-facing UI remains planned.
