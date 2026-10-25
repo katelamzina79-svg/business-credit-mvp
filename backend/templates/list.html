@@ -89,6 +89,14 @@
   }
   function showError(id, message) { $(id).textContent = message; $(id).classList.remove('hidden'); }
   function hideError(id) { $(id).classList.add('hidden'); $(id).textContent = ''; }
+  async function waitForPipeline(applicationId) {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const latest = await api('/api/applications/' + applicationId);
+      if (latest.status === 'scoring' || ['approved','other_terms','documents_required','rejected'].includes(latest.status)) return latest;
+      await new Promise(resolve => setTimeout(resolve, 250));
+    }
+    return null;
+  }
   function showApp() {
     $('login-panel').classList.add('hidden'); $('app-panel').classList.remove('hidden'); $('header-user').classList.remove('hidden'); $('header-user').classList.add('flex');
     $('user-label').textContent = currentUser ? `${currentUser.email}${currentUser.role === 'banker' ? ' · сотрудник банка' : ''}` : '';
@@ -132,6 +140,7 @@
     try {
       const created=await api('/api/applications',{method:'POST',body:JSON.stringify({company_id:Number($('company-id').value),product:document.querySelector('input[name="product"]:checked').value,amount,term_months:term,purpose:$('purpose').value.trim() || null})});
       await api(`/api/applications/${created.id}/submit`,{method:'POST'});
+      await waitForPipeline(created.id);
       selectedCompany=null; $('company-id').value=''; $('company-card').classList.add('hidden'); $('inn').value=''; $('purpose').value='';
       await loadApplications();
       await loadFeed();
