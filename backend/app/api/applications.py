@@ -116,6 +116,19 @@ def submit(application_id: int, db: Session = Depends(get_db), user: User = Depe
     return application
 
 
+@router.post("/{application_id}/sign", response_model=ApplicationOut)
+def sign_offer(application_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    if user.role != "client":
+        raise HTTPException(status_code=403, detail="Only the client can sign the demo offer")
+    application = _get_visible_application(application_id, db, user)
+    if application.status not in {ApplicationStatus.approved.value, ApplicationStatus.other_terms.value}:
+        raise HTTPException(status_code=409, detail="The application has no offer ready for signing")
+    _apply_transition(application, ApplicationStatus.signing.value, db, user, "application.offer_signed_demo")
+    db.commit()
+    db.refresh(application)
+    return application
+
+
 @router.post("/{application_id}/transition", response_model=ApplicationOut)
 def transition_application(application_id: int, data: TransitionRequest, db: Session = Depends(get_db), user: User = Depends(banker_only)):
     application = db.get(Application, application_id)
