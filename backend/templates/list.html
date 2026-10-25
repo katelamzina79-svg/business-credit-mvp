@@ -37,6 +37,8 @@
       </div>
     </div>
 
+    <section id="smart-feed" class="hidden bg-white border border-slate-200 rounded-3xl p-6 mb-6"><div class="flex items-center justify-between gap-3 mb-4"><div><p class="text-xs uppercase tracking-wider font-bold text-emerald-700">Персональные подсказки</p><h2 class="text-xl font-bold mt-1">Что полезно вашему бизнесу</h2></div><span class="text-xs text-slate-500">Демо-правила</span></div><div id="feed-items" class="grid md:grid-cols-2 gap-3"></div></section>
+
     <div class="grid lg:grid-cols-[.9fr_1.1fr] gap-6 items-start">
       <section id="new-application" class="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7">
         <div class="mb-6"><p class="text-xs uppercase tracking-wider font-bold text-indigo-600">Новая заявка</p><h2 class="text-2xl font-bold mt-1">Что нужно вашему бизнесу?</h2><p class="text-sm text-slate-500 mt-2">Заполните основные параметры — это займёт пару минут.</p></div>
@@ -90,15 +92,12 @@
   function showApp() {
     $('login-panel').classList.add('hidden'); $('app-panel').classList.remove('hidden'); $('header-user').classList.remove('hidden'); $('header-user').classList.add('flex');
     $('user-label').textContent = currentUser ? `${currentUser.email}${currentUser.role === 'banker' ? ' · сотрудник банка' : ''}` : '';
-    if (currentUser?.role === 'banker') {
-      $('new-application').classList.add('hidden');
-      $('applications-list').insertAdjacentHTML('beforebegin','<div class="mb-4 rounded-xl bg-indigo-50 text-indigo-800 text-sm p-3">Вы вошли как сотрудник банка. Очередь заявок доступна в API: <code>/api/applications/banker/queue</code> (Swagger — <code>/docs</code>).</div>');
-    }
+    if (currentUser?.role === 'banker') { window.location.replace('/banker'); }
   }
   function showLogin() { $('app-panel').classList.add('hidden'); $('login-panel').classList.remove('hidden'); $('header-user').classList.add('hidden'); }
   async function loadUser() {
     if (!token) return showLogin();
-    try { currentUser = await api('/api/auth/me'); showApp(); await loadApplications(); }
+    try { currentUser = await api('/api/auth/me'); if (currentUser.role === 'banker') { window.location.replace('/banker'); return; } showApp(); await loadApplications(); await loadFeed(); }
     catch (_) { token=''; sessionStorage.removeItem(tokenKey); showLogin(); }
   }
   $('login-form').addEventListener('submit', async (event) => {
@@ -107,7 +106,7 @@
     try {
       const response = await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});
       const data = await response.json(); if (!response.ok) throw new Error(data.detail || 'Не удалось войти');
-      token = data.access_token; sessionStorage.setItem(tokenKey,token); currentUser = await api('/api/auth/me'); showApp(); await loadApplications();
+      token = data.access_token; sessionStorage.setItem(tokenKey,token); currentUser = await api('/api/auth/me'); if (currentUser.role === 'banker') { window.location.replace('/banker'); return; } showApp(); await loadApplications(); await loadFeed();
     } catch (error) { showError('login-error',error.message); }
   });
   $('logout').addEventListener('click', () => { token=''; currentUser=null; selectedCompany=null; sessionStorage.removeItem(tokenKey); showLogin(); });
@@ -146,7 +145,9 @@
     const stepOrder=['submitted','data_check','scoring','approved'];
     const idx=stepOrder.indexOf(app.status);
     const progress=app.status==='rejected' ? 0 : app.status==='disbursed' ? 100 : app.status==='signing' ? 90 : app.status==='other_terms' || app.status==='documents_required' ? 75 : Math.max(18,(idx+1)*24);
-    return `<article class="rounded-2xl border border-slate-200 p-4 hover:border-indigo-200 transition"><div class="flex items-start justify-between gap-3"><div><p class="text-xs text-slate-500">Заявка №${app.id}</p><h3 class="font-semibold mt-1">${money(app.amount)} · ${app.term_months} мес.</h3><p class="text-sm text-slate-500 mt-1">${({'credit':'Кредит','overdraft':'Овердрафт','working_capital':'Оборотный кредит'})[app.product] || app.product}</p></div><span class="shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${badge}">${title}</span></div><div class="mt-4 h-1.5 rounded-full bg-slate-100 overflow-hidden"><div class="h-full rounded-full bg-indigo-500" style="width:${progress}%"></div></div><div class="flex justify-between mt-2 text-[11px] text-slate-400"><span>Отправлена</span><span>Проверка</span><span>Решение</span></div><p class="mt-3 text-sm text-slate-600">${app.purpose ? escapeHtml(app.purpose) : 'Цель финансирования не указана'}</p><button class="history-button mt-3 text-sm font-semibold text-indigo-700 hover:text-indigo-900" data-id="${app.id}">История статусов +</button><div id="history-${app.id}" class="hidden mt-3 rounded-xl bg-slate-50 p-3 text-sm"></div></article>`;
+    const decisionText = {approved:'Рекомендация: одобрить',other_terms:'Рекомендация: другие условия',documents_required:'Рекомендация: запросить документы',rejected:'Рекомендация: отказ'};
+    const decisionBlock = app.score !== null && app.score !== undefined ? `<div class="mt-3 rounded-xl bg-slate-50 p-3"><p class="text-sm font-semibold">Демо-скоринг: ${app.score}/100 · риск: ${escapeHtml(app.risk_level || '—')}</p><p class="text-sm text-indigo-700 mt-1">${escapeHtml(decisionText[app.decision_recommendation] || app.decision_recommendation || '')}</p><ul class="list-disc pl-5 mt-2 text-xs text-slate-600 space-y-1">${(app.decision_reasons || []).slice(0,3).map(r => '<li>' + escapeHtml(r) + '</li>').join('')}</ul><p class="text-[11px] text-slate-400 mt-2">Оценка по синтетическим данным; окончательное решение принимает банкир.</p></div>` : '';
+    return `<article class="rounded-2xl border border-slate-200 p-4 hover:border-indigo-200 transition"><div class="flex items-start justify-between gap-3"><div><p class="text-xs text-slate-500">Заявка №${app.id}</p><h3 class="font-semibold mt-1">${money(app.amount)} · ${app.term_months} мес.</h3><p class="text-sm text-slate-500 mt-1">${({'credit':'Кредит','overdraft':'Овердрафт','working_capital':'Оборотный кредит'})[app.product] || app.product}</p></div><span class="shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${badge}">${title}</span></div><div class="mt-4 h-1.5 rounded-full bg-slate-100 overflow-hidden"><div class="h-full rounded-full bg-indigo-500" style="width:${progress}%"></div></div><div class="flex justify-between mt-2 text-[11px] text-slate-400"><span>Отправлена</span><span>Проверка</span><span>Решение</span></div><p class="mt-3 text-sm text-slate-600">${app.purpose ? escapeHtml(app.purpose) : 'Цель финансирования не указана'}</p>${decisionBlock}<button class="history-button mt-3 text-sm font-semibold text-indigo-700 hover:text-indigo-900" data-id="${app.id}">История статусов +</button><div id="history-${app.id}" class="hidden mt-3 rounded-xl bg-slate-50 p-3 text-sm"></div></article>`;
   }
   function escapeHtml(value) { return String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
   async function loadApplications() {
@@ -166,7 +167,15 @@
       target.innerHTML=history.length ? history.map(item=>`<div class="flex gap-3 py-1.5"><span class="mt-1.5 w-2 h-2 shrink-0 rounded-full bg-indigo-500"></span><div><p class="font-medium">${escapeHtml(statusText[item.to_status] || item.to_status)}</p><p class="text-xs text-slate-500">${new Date(item.created_at+'Z').toLocaleString('ru-RU')}</p></div></div>`).join('') : 'История пока пуста.';
     } catch(error) { target.textContent=error.message; }
   });
-  $('refresh-applications').addEventListener('click',loadApplications);
+  async function loadFeed() {
+    try {
+      const response = await fetch('/feed/snippet', {headers: token ? {'Authorization': 'Bearer ' + token} : {}});
+      if (!response.ok) throw new Error('Feed unavailable');
+      $('feed-items').innerHTML = await response.text();
+      $('smart-feed').classList.remove('hidden');
+    } catch (_) { $('smart-feed').classList.add('hidden'); }
+  }
+  $('refresh-applications').addEventListener('click',async () => { await loadApplications(); await loadFeed(); });
   loadUser();
 })();
 </script>
