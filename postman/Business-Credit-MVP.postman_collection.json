@@ -150,7 +150,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"company_id\": \"{{companyId}}\",\n  \"product\": \"credit\",\n  \"amount\": 1000000,\n  \"term_months\": 24,\n  \"purpose\": \"Пополнение оборотных средств\"\n}",
+          "raw": "{\n  \"company_id\": {{companyId}},\n  \"product\": \"credit\",\n  \"amount\": 1000000,\n  \"term_months\": 24,\n  \"purpose\": \"Пополнение оборотных средств\"\n}",
           "options": {
             "raw": {
               "language": "json"
