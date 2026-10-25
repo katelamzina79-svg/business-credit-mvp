@@ -43,7 +43,7 @@
     if (app.status === 'scoring') {
       actions = '<div class="flex flex-wrap gap-2 mt-4">' + Object.keys(decisionText).map(target => '<button data-id="' + app.id + '" data-target="' + target + '" class="decision-btn rounded-xl px-3 py-2 text-sm font-semibold ' + (target === app.decision_recommendation ? 'bg-indigo-600 text-white' : 'border border-slate-300 bg-white') + '">' + decisionText[target] + (target === app.decision_recommendation ? ' · рекомендация' : '') + '</button>').join('') + '</div>';
     } else if (app.status === 'approved' || app.status === 'other_terms') {
-      actions = '<div class="mt-4"><button data-id="' + app.id + '" data-target="signing" class="decision-btn rounded-xl bg-indigo-600 text-white px-4 py-2 text-sm font-semibold">Перейти к подписанию (мок)</button></div>';
+      actions = '<p class="mt-4 rounded-xl bg-cyan-50 text-cyan-800 p-3 text-sm">Предложение готово. Ожидаем подпись клиента в личном кабинете.</p>';
     } else if (app.status === 'signing') {
       actions = '<div class="mt-4"><button data-id="' + app.id + '" data-target="disbursed" class="decision-btn rounded-xl bg-emerald-600 text-white px-4 py-2 text-sm font-semibold">Отметить выдачу (мок)</button></div>';
     } else if (app.status === 'documents_required') {
