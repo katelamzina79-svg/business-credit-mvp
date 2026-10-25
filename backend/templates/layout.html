@@ -1,5 +1,43 @@
 <!doctype html>
 <html lang="ru">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ title or 'Credit MVP' }}</title><script src="https://cdn.tailwindcss.com"></script><script src="https://unpkg.com/htmx.org@2.0.4"></script></head>
-<body class="bg-slate-50 text-slate-900"><main class="max-w-6xl mx-auto p-6">{% block content %}{% endblock %}</main></body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ title or 'Credit MVP' }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>
+    /* Глобальные оверрайды стилей под дизайн-код Альфа-Банка */
+    body {
+      background-color: #F2F3F5 !important; /* Серый мягкий фон страниц Альфа-Бизнес */
+      color: #0B1118 !important;            /* Контрастный графитовый текст */
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    }
+    
+    /* Коррекция системных фонов и карточек */
+    .bg-slate-50 { background-color: #F2F3F5 !important; }
+    .bg-white { background-color: #FFFFFF !important; }
+    .text-slate-900 { color: #0B1118 !important; }
+    
+    /* Скругления по гайдлайнам банка */
+    .rounded-2xl { border-radius: 12px !important; }
+    .rounded-xl { border-radius: 8px !important; }
+    
+    /* Инпуты, кнопки и элементы форм */
+    input, select, textarea {
+      font-family: inherit !important;
+      border-radius: 8px !important;
+    }
+    input:focus, select:focus {
+      border-color: #EF3124 !important; /* Красный фокус полей */
+      outline: none !important;
+      box-shadow: 0 0 0 1px #EF3124 !important;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <main class="max-w-6xl mx-auto p-6">
+    {% block content %}{% endblock %}
+  </main>
+</body>
 </html>
