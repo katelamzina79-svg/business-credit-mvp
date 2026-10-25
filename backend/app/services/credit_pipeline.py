@@ -1,85 +1,98 @@
-"""Explainable rule-based scoring and recommendation for the hackathon MVP.
+"""ML scoring + separate decision layer for the hackathon MVP.
 
-This is a transparent synthetic-data demo, not a production credit model.
-The thresholds should be aligned with Gena's scoring specification before demo freeze.
+Flow inside this function (the surrounding order EGRUL -> BKI -> scoring -> decision
+-> banker -> client is unchanged):
+    external_checks -> features -> LogisticRegression probability (app.ml.model)
+    -> decision layer (app.ml.decision) -> the same result dict as before.
+
+This is a demo on synthetic data, not a production credit model. See app/ml/README.md.
 """
+from app.ml import config as cfg
+from app.ml.decision import check_state, decide, reason_text, risk_level
+from app.ml.model import predict
 from app.models.models import Application, Company
 
+# Minimum probability points a feature must add to be shown as a scoring factor.
+MIN_FACTOR_DELTA = 0.02
 
-def evaluate_application(application: Application, company: Company, external_checks: dict) -> dict:
+
+def build_features(application: Application, company: Company, overdue_days: int) -> tuple[dict, list[str]]:
+    """Map the existing schema to model features. Returns (features, names filled by assumption)."""
     revenue = float(company.revenue or 0)
     debt = float(company.debt or 0)
     amount = float(application.amount or 0)
-    term_months = int(application.term_months or 0)
-    overdue_days = int((external_checks.get("bki") or {}).get("overdue_days", 0))
+    assumed: list[str] = []
 
-    score = 100
-    factors: list[dict] = []
-    reasons: list[str] = []
+    if revenue > 0:
+        debt_to_revenue, amount_to_revenue = debt / revenue, amount / revenue
+    else:  # cannot divide: be conservative; the decision layer asks for data separately
+        debt_to_revenue = cfg.WORST_CASE["debt_to_revenue"]
+        amount_to_revenue = cfg.WORST_CASE["amount_to_revenue"]
+        assumed += ["debt_to_revenue", "amount_to_revenue"]
 
-    def penalize(code: str, label: str, points: int, reason: str) -> None:
-        nonlocal score
-        score -= points
-        factors.append({"code": code, "label": label, "impact": -points})
-        reasons.append(reason)
+    features = {
+        # Company has no age/registration date yet -> None = median of training data.
+        "company_age_years": getattr(company, "company_age_years", None),
+        "annual_revenue": revenue if revenue > 0 else None,
+        "requested_amount": amount,
+        "debt_to_revenue": debt_to_revenue,
+        "amount_to_revenue": amount_to_revenue,
+        # Only overdue_days exists, not a count: proxy 0 / 1.
+        "overdue_count": 1 if overdue_days > 0 else 0,
+    }
+    return features, assumed
 
-    if overdue_days >= 30:
-        penalize("bki_overdue_30", "Просрочка 30 дней и более", 45,
-                 f"В демонстрационных данных БКИ указана просрочка {overdue_days} дн.")
-    elif overdue_days > 0:
-        penalize("bki_overdue", "Есть просрочка", 20,
-                 f"В демонстрационных данных БКИ указана просрочка {overdue_days} дн.")
 
-    debt_ratio = debt / revenue if revenue > 0 else 1.0
-    if debt_ratio >= 0.60:
-        penalize("high_debt_ratio", "Высокая долговая нагрузка", 25,
-                 "Долг составляет не менее 60% годовой выручки в тестовом профиле.")
-    elif debt_ratio >= 0.30:
-        penalize("medium_debt_ratio", "Повышенная долговая нагрузка", 15,
-                 "Долг составляет не менее 30% годовой выручки в тестовом профиле.")
-    elif debt_ratio >= 0.15:
-        penalize("debt_ratio", "Умеренная долговая нагрузка", 8,
-                 "Долговую нагрузку стоит учесть при проверке заявки.")
+def evaluate_application(
+    application: Application,
+    company: Company,
+    external_checks: dict,
+    missing_documents: bool = False,
+) -> dict:
+    bki = (external_checks or {}).get("bki") or {}
+    overdue_days = int(bki.get("overdue_days", company.overdue_days or 0) or 0)
+    revenue = float(company.revenue or 0)
 
-    amount_ratio = amount / revenue if revenue > 0 else 2.0
-    if amount_ratio > 1:
-        penalize("amount_over_revenue", "Сумма выше годовой выручки", 20,
-                 "Запрошенная сумма превышает годовую выручку из тестового профиля.")
-    elif amount_ratio > 0.5:
-        penalize("large_amount", "Высокая сумма относительно выручки", 10,
-                 "Запрошенная сумма превышает 50% годовой выручки из тестового профиля.")
+    features, assumed = build_features(application, company, overdue_days)
+    prediction = predict(features)
+    p = prediction["risk_probability"]
 
-    if term_months > 36:
-        penalize("long_term", "Длительный срок", 5,
-                 "Срок заявки превышает 36 месяцев и требует дополнительной проверки.")
+    outcome = decide(
+        risk_probability=p,
+        product=application.product,
+        features={**features, "annual_revenue": revenue},
+        external_checks=external_checks,
+        overdue_days=overdue_days,
+        missing_documents=missing_documents,
+        missing_data=revenue <= 0,
+    )
 
-    score = max(0, min(100, score))
-    risk_level = "low" if score >= 75 else "medium" if score >= 55 else "high"
-
-    if overdue_days >= 30 or score < 35:
-        recommendation = "rejected"
-        reasons.insert(0, "Рекомендация демо-правил: отказ из-за критичного фактора риска.")
-    elif score < 55 or amount_ratio > 1:
-        recommendation = "documents_required"
-        reasons.insert(0, "Рекомендация демо-правил: запросить дополнительные сведения.")
-    elif score < 75 or amount_ratio > 0.5:
-        recommendation = "other_terms"
-        reasons.insert(0, "Рекомендация демо-правил: рассмотреть меньшую сумму или другие условия.")
-    else:
-        recommendation = "approved"
-        if not reasons:
-            reasons.append("По имеющимся тестовым данным критичных факторов риска не выявлено.")
-        reasons.insert(0, "Рекомендация демо-правил: одобрение.")
-
-    recommended_amount = round(amount * 0.8, 2) if recommendation == "other_terms" else None
+    factors = [
+        {
+            "code": f["feature"],
+            "label": cfg.FEATURE_LABELS[f["feature"]],
+            "impact": -round(100 * f["risk_delta"]),  # points of risk vs an average applicant
+        }
+        for f in prediction["top_factors"]
+        if f["risk_delta"] >= MIN_FACTOR_DELTA and round(100 * f["risk_delta"]) > 0
+    ]
+    reasons = [reason_text(code) for code in outcome["reason_codes"]]
+    reasons.insert(0, f"Вероятность высокого риска по демо-модели: {p:.0%} (синтетические данные).")
 
     return {
-        "score": score,
-        "risk_level": risk_level,
+        # fields persisted by the API (unchanged names/types)
+        "score": prediction["score"],
+        "risk_level": risk_level(p),
         "score_factors": factors,
-        "decision_recommendation": recommendation,
+        "decision_recommendation": outcome["decision"],
         "decision_reasons": reasons,
-        "recommended_amount": recommended_amount,
+        "recommended_amount": outcome["recommended_amount"],
         "external_checks": external_checks,
         "bki_overdue_days": overdue_days,
+        # extra structured fields (not persisted yet, see README "Open questions")
+        "risk_probability": p,
+        "reason_codes": outcome["reason_codes"],
+        "model_version": prediction["model_version"],
+        "assumed_inputs": sorted(set(prediction["imputed_features"]) | set(assumed)),
+        "checks_state": check_state(external_checks),
     }
