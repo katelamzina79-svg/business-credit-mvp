@@ -81,6 +81,32 @@ def banker_queue(db: Session = Depends(get_db), user: User = Depends(banker_only
     return result
 
 
+@router.post("/{application_id}/retry-pipeline")
+def retry_pipeline(
+    application_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user: User = Depends(banker_only),
+):
+    """Allow a banker to retry a failed or stalled demo pipeline."""
+    application = db.get(Application, application_id)
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+    if application.status not in {
+        ApplicationStatus.submitted.value,
+        ApplicationStatus.data_check.value,
+    }:
+        raise HTTPException(status_code=409, detail="Повторная проверка доступна только для заявок на этапе проверки данных")
+
+    if application.status == ApplicationStatus.submitted.value:
+        _apply_transition(application, ApplicationStatus.data_check.value, db, user, "application.external_checks.retried")
+    else:
+        db.add(AuditLog(user_id=user.id, action="application.pipeline_retry_requested", entity_type="application", entity_id=application.id))
+    db.commit()
+    background_tasks.add_task(_process_application_pipeline, application.id, user.id)
+    return {"message": "Проверка запущена повторно", "application_id": application.id}
+
+
 @router.get("/{application_id}/history", response_model=list[StatusHistoryOut])
 def application_history(application_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
     application = _get_visible_application(application_id, db, user)
