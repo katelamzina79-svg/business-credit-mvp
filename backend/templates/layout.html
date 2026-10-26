@@ -20,12 +20,11 @@
     .alfa-btn:hover { background:#D7241A !important; }
     .alfa-btn:disabled { opacity:.5 !important; cursor:not-allowed !important; }
     .alfa-link { color:#EF3124 !important; }
-    .alfa-badge { border-radius:9999px !important; padding:.25rem .75rem !important; font-size:.75rem !important; font-weight:600 !important; }
     .app-sidebar { position:fixed; inset:0 auto 0 0; width:248px; background:#fff; border-right:1px solid #E5E7EB; padding:24px 16px; display:flex; flex-direction:column; z-index:40; }
     .app-sidebar-logo { display:flex; align-items:center; gap:10px; padding:4px 8px 24px; text-decoration:none; }
-    .app-sidebar-logo-mark { width:38px; height:38px; display:grid; place-items:center; border-radius:11px; background:#EF3124; color:#fff; font-weight:800; }
-    .app-sidebar-logo-title { color:#0B1118; font-size:16px; line-height:1.15; font-weight:750; }
-    .app-sidebar-logo-subtitle { color:#94A3B8; font-size:11px; margin-top:3px; }
+    .app-sidebar-logo-mark { width:38px; height:38px; flex:0 0 38px; display:grid; place-items:center; border-radius:10px; background:#EF3124; color:#fff; font-weight:800; }
+    .app-sidebar-logo-title { display:block; color:#0B1118; font-size:16px; line-height:1.15; font-weight:750; white-space:nowrap; }
+    .app-sidebar-logo-subtitle { display:block; color:#94A3B8; font-size:10px; line-height:1.3; margin-top:4px; white-space:nowrap; }
     .app-sidebar-section { color:#94A3B8; font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; padding:0 10px 8px; }
     .app-sidebar-nav { display:flex; flex-direction:column; gap:4px; }
     .app-sidebar-link { display:flex; align-items:center; gap:11px; min-height:42px; padding:9px 11px; border-radius:9px; color:#475569; text-decoration:none; font-size:14px; font-weight:600; }
@@ -40,11 +39,15 @@
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
-{% set cabinet = request.url.path.startswith('/client') or request.url.path.startswith('/banker') %}
+{% set cabinet = request.url.path.startswith('/client') or (request.url.path.startswith('/banker') and request.url.path != '/banker/login') %}
 {% if cabinet %}
   <div class="app-sidebar">
     <a href="{{ '/client' if request.url.path.startswith('/client') else '/banker' }}" class="app-sidebar-logo">
-      <span class="app-sidebar-logo-mark">А</span><span><span class="app-sidebar-logo-title">Бизнес.Кредит</span><span class="app-sidebar-logo-subtitle">Финансирование для бизнеса</span></span>
+      <span class="app-sidebar-logo-mark">А</span>
+      <span>
+        <span class="app-sidebar-logo-title">Бизнес.Кредит</span>
+        <span class="app-sidebar-logo-subtitle">Финансирование для бизнеса</span>
+      </span>
     </a>
     {% if request.url.path.startswith('/client') %}
       <div class="app-sidebar-section">Кабинет клиента</div>
@@ -65,15 +68,5 @@
   </div>
 {% endif %}
 <div class="{{ 'app-page' if cabinet else '' }}"><main>{% block content %}{% endblock %}</main></div>
-<script>
-document.addEventListener('click', function(event) {
-  const button = event.target.closest('#banker-logout');
-  if (!button) return;
-  event.preventDefault();
-  event.stopImmediatePropagation();
-  sessionStorage.removeItem('businessCreditDemoToken');
-  window.location.href = '/banker/login';
-}, true);
-</script>
 </body>
 </html>
