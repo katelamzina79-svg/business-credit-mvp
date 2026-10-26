@@ -81,7 +81,9 @@
     const reasons = (app.decision_reasons || []).map(r => '<li>' + escapeHtml(r) + '</li>').join('');
 
     let actions = '';
-    if (app.status === 'scoring') {
+    if (app.status === 'submitted' || app.status === 'data_check') {
+      actions = '<div class="mt-4 rounded-xl bg-amber-50 p-3"><p class="text-sm text-amber-800 mb-2">Проверка данных ещё не завершилась. Можно запустить её повторно.</p><button data-id="' + app.id + '" class="retry-pipeline-btn alfa-btn rounded-xl px-4 py-2 text-sm">Повторить проверку</button></div>';
+    } else if (app.status === 'scoring') {
       actions = '<div class="flex flex-wrap gap-2 mt-4">' + Object.keys(decisionText).map(target => {
         const isRec = target === app.decision_recommendation;
         const cls = isRec ? 'alfa-btn' : 'border border-slate-300 bg-white hover:bg-slate-50';
@@ -141,6 +143,21 @@
   }
 
   $('queue-list').addEventListener('click', async (event) => {
+    const retryButton = event.target.closest('.retry-pipeline-btn');
+    if (retryButton) {
+      retryButton.disabled = true;
+      retryButton.textContent = 'Запускаем проверку…';
+      try {
+        await api('/api/applications/' + retryButton.dataset.id + '/retry-pipeline', {method:'POST'});
+        await loadQueue();
+      } catch (error) {
+        $('queue-error').textContent = error.message;
+        $('queue-error').classList.remove('hidden');
+        retryButton.disabled = false;
+        retryButton.textContent = 'Повторить проверку';
+      }
+      return;
+    }
     const button = event.target.closest('.decision-btn');
     if (!button) return;
     button.disabled = true;
