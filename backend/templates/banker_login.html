@@ -1,0 +1,29 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="auth-page">
+  <div class="w-full max-w-md">
+    <div class="text-center mb-7"><div class="inline-grid place-items-center w-14 h-14 rounded-2xl text-white font-bold text-xl" style="background:#EF3124">А</div><h1 class="text-3xl font-bold mt-4">Бизнес.Кредит</h1><p class="text-slate-500 mt-1">Вход сотрудника банка</p></div>
+    <div class="bg-white p-7 sm:p-9 alfa-card">
+      <div class="inline-flex rounded-full px-3 py-1 text-xs font-semibold mb-4" style="background:#FFF1F0;color:#EF3124">MVP · демо-стенд</div>
+      <h2 class="text-2xl font-bold mb-2">Кабинет банкира</h2>
+      <p class="text-slate-500 text-sm mb-6">После входа здесь будут отдельно: главная и рабочий раздел заявок.</p>
+      <form id="login-form" class="space-y-4">
+        <label class="block"><span class="text-sm font-medium">Email</span><input id="email" type="email" required value="banker@example.com" class="mt-1 w-full px-4 py-3 border alfa-input"></label>
+        <label class="block"><span class="text-sm font-medium">Пароль</span><input id="password" type="password" required value="banker123" class="mt-1 w-full px-4 py-3 border alfa-input"></label>
+        <div id="error" class="hidden rounded-xl bg-rose-50 text-rose-700 p-3 text-sm"></div>
+        <button class="w-full py-3 alfa-btn" type="submit">Войти</button>
+      </form>
+      <div class="mt-5 rounded-xl bg-slate-50 p-4 text-sm text-slate-600"><strong class="text-slate-800">Демо-доступ</strong><br>banker@example.com / banker123</div>
+      <a href="/login" class="block text-center mt-5 text-sm alfa-link hover:underline">Я клиент →</a>
+    </div>
+  </div>
+</div>
+<script>
+(() => { const tokenKey='businessCreditDemoToken'; const error=document.getElementById('error');
+  document.getElementById('login-form').addEventListener('submit', async e => { e.preventDefault(); error.classList.add('hidden');
+    try { const body=new URLSearchParams({username:document.getElementById('email').value.trim(),password:document.getElementById('password').value}); const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body}); const d=await r.json(); if(!r.ok) throw new Error(d.detail||'Не удалось войти'); sessionStorage.setItem(tokenKey,d.access_token); const me=await fetch('/api/auth/me',{headers:{Authorization:'Bearer '+d.access_token}}); const user=await me.json(); if(user.role!=='banker') { sessionStorage.removeItem(tokenKey); throw new Error('Этот вход предназначен для сотрудника банка.'); } window.location.href='/banker'; }
+    catch(err){ error.textContent=err.message; error.classList.remove('hidden'); }
+  });
+})();
+</script>
+{% endblock %}
